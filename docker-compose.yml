@@ -1,0 +1,10 @@
+services:
+  backend:
+    build: .
+    image: ai-chat-app
+    network_mode: "host"
+    volumes:
+      - ./ai_chat.db:/app/ai_chat.db
+    environment:
+      - OLLAMA_HOST=http://127.0.0.1:11434
+    restart: unless-stopped

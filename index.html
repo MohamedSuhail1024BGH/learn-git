@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Chat Client</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+    .chat-card {
+      background: #1e293b;
+      width: 100%;
+      max-width: 560px;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+    }
+    h2 {
+      margin-top: 0;
+      font-size: 1.25rem;
+      color: #38bdf8;
+    }
+    .reg-box {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 20px;
+    }
+    .reg-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .reg-row input, .reg-row select, .reg-row button {
+      margin-bottom: 0;
+    }
+    label {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      display: block;
+      margin-bottom: 6px;
+    }
+    input, select, textarea {
+      width: 100%;
+      box-sizing: border-box;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #f8fafc;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      margin-bottom: 16px;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: #38bdf8;
+    }
+    button {
+      width: 100%;
+      background: #0284c7;
+      color: #ffffff;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #0369a1;
+    }
+    .btn-danger {
+      background: #dc2626;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      width: auto;
+    }
+    .btn-danger:hover {
+      background: #b91c1c;
+    }
+    .history-section {
+      margin-top: 28px;
+    }
+    .history-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .history-title {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 320px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .chat-bubble {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .bubble-prompt {
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-bottom: 6px;
+      font-size: 0.95rem;
+    }
+    .bubble-reply {
+      color: #cbd5e1;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+    .bubble-meta {
+      margin-top: 6px;
+      font-size: 0.75rem;
+      color: #38bdf8;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="chat-card">
+    <h2>Full-Stack AI Interface</h2>
+
+    <!-- Registration Panel -->
+    <div class="reg-box">
+      <label>Register a New User Account</label>
+      <div class="reg-row">
+        <input type="text" id="newUsername" placeholder="New username (e.g. Meera)" />
+        <select id="newPlan" style="max-width: 110px;">
+          <option value="free">Free</option>
+          <option value="pro">Pro</option>
+        </select>
+        <button onclick="registerNewUser()" style="max-width: 110px;">Sign Up</button>
+      </div>
+    </div>
+    
+    <label for="username">Active User</label>
+    <div class="reg-row" style="margin-bottom: 16px;">
+      <input type="text" id="username" value="Hari" onchange="loadHistory()" />
+      <button onclick="upgradeUserPlan()" style="max-width: 150px; background: #10b981;">Upgrade to Pro</button>
+    </div>
+
+    <label for="modelSelect">Select Model</label>
+    <select id="modelSelect">
+      <option value="qwen2.5:1.5b">qwen2.5:1.5b (Free Tier)</option>
+      <option value="llama3">llama3 (Pro Tier)</option>
+      <option value="mistral">mistral (Pro Tier)</option>
+    </select>
+
+    <label for="promptBox">Your Prompt</label>
+    <textarea id="promptBox" rows="2" placeholder="Ask something..."></textarea>
+
+    <button id="sendBtn" onclick="sendPromptToPython()">Send to Python Backend</button>
+
+    <div class="history-section">
+      <div class="history-header">
+        <div class="history-title">Persisted Conversation Log</div>
+        <button class="btn-danger" onclick="clearUserHistory()">Clear History</button>
+      </div>
+      <div id="historyContainer" class="history-list">
+        <div style="color: #64748b; font-size: 0.85rem;">Loading past messages...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 1. Register a brand-new user via POST /register
+    async function registerNewUser() {
+      const nameInput = document.getElementById("newUsername");
+      const planSelect = document.getElementById("newPlan");
+      const newName = nameInput.value.trim();
+
+      if (!newName) return;
+
+      const response = await fetch("http://127.0.0.1:8000/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: newName,
+          plan: planSelect.value
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(`Registration Failed: ${data.detail}`);
+        return;
+      }
+
+      alert(`User '${data.username}' registered on the '${data.plan}' plan!`);
+      document.getElementById("username").value = data.username;
+      nameInput.value = "";
+      loadHistory();
+    }
+
+    // 2. Fetch past chats via GET /chats/{username}
+    async function loadHistory() {
+      const user = document.getElementById("username").value.trim();
+      const container = document.getElementById("historyContainer");
+      if (!user) return;
+
+      try {
+        const response = await fetch(`http://127.0.0.1:8000/chats/${user}`);
+        const data = await response.json();
+        
+        container.innerHTML = "";
+
+        if (!data.all_chats || data.all_chats.length === 0) {
+          container.innerHTML = `<div style="color: #64748b; font-size: 0.85rem;">No past messages found for ${user}.</div>`;
+          return;
+        }
+
+        data.all_chats.forEach(chat => {
+          const item = document.createElement("div");
+          item.className = "chat-bubble";
+          item.innerHTML = `
+            <div class="bubble-prompt">You: ${chat.prompt}</div>
+            <div class="bubble-reply">${chat.ai_reply}</div>
+            <div class="bubble-meta">[Model: ${chat.model} | Plan: ${chat.plan} | Tokens: ${chat.tokens}]</div>
+          `;
+          container.appendChild(item);
+        });
+
+        container.scrollTop = container.scrollHeight;
+      } catch (err) {
+        container.innerHTML = `<div style="color: #ef4444; font-size: 0.85rem;">Could not load history from server.</div>`;
+      }
+    }
+
+    // 3. Send prompt via POST /chat_with_ai
+    async function sendPromptToPython() {
+      const btn = document.getElementById("sendBtn");
+      const user = document.getElementById("username").value.trim();
+      const selectedModel = document.getElementById("modelSelect").value;
+      const promptInput = document.getElementById("promptBox");
+      const promptText = promptInput.value.trim();
+      const container = document.getElementById("historyContainer");
+
+      if (!promptText) return;
+
+      btn.innerText = "Streaming...";
+      btn.disabled = true;
+
+      try {
+        const response = await fetch("http://127.0.0.1:8000/chat_with_ai", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sender: user,
+            prompt: promptText,
+            model: selectedModel
+          })
+        });
+
+        if (!response.ok) {
+          const errData =  await response.json();
+          alert(`Access Denied (${response.status}): ${data.detail}`);
+          return;
+        }
+
+        promptInput.value = "";
+
+        const liveBubble = document.createElement("div");
+        liveBubble.className = "chat-bubble";
+        liveBubble.innerHTML = `
+          <div class="bubble-prompt">You: ${promptText}</div>
+          <div class="bubble-reply" id="liveReply">...</div>
+          <div class="bubble-meta">[Model: ${selectedModel} | Streaming live...]</div>
+        `;
+        container.appendChild(liveBubble);
+        const liveReplyDiv = liveBubble.querySelector("#liveReply");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunkText = decoder.decode(value, { stream: true });
+          liveReplyDiv.innerText += chunkText;
+          container.scrollTop = container.scrollHeight;
+        }
+
+        await loadHistory(); 
+        // Refresh chat badges after streaming completes
+      } catch (err) {
+        alert("Error connecting to the backend: Is FASTAPI running?");
+      } finally {
+        btn.innerText = "Send to Python Backend";
+        btn.disabled = false;
+      }
+    }
+
+    // 4. Clear user history via DELETE /chats/{username}
+    async function clearUserHistory() {
+      const user = document.getElementById("username").value.trim();
+      if (!user) return;
+
+      const response = await fetch(`http://127.0.0.1:8000/chats/${user}`, {
+        method: "DELETE"
+      });
+
+      if (response.ok) {
+        await loadHistory();
+      } else {
+        const data = await response.json();
+        alert(`Error: ${data.detail}`);
+      }
+    }
+
+    // 5. Update user plan via PUT /users/{username}/plan
+    async function upgradeUserPlan() {
+      const user = document.getElementById("username").value.trim();
+      if (!user) return;
+
+      try {
+        const response = await fetch(`http://127.0.0.1:8000/users/${encodeURIComponent(user)}/plan`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan: "pro" })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(`Update Failed (${response.status}): ${data.detail}`);
+        return;
+      }
+
+      alert(`Success! ${data.username} is now on the '${data.new_plan}' plan.`);
+      await loadHistory(); // Refresh chat badges to reflect the new plan
+    } catch (err) {
+      alert(`Network Error: ${err.message}`);
+    }
+  }
+
+    window.onload = loadHistory;
+  </script>
+</body>
+</html>

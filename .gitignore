@@ -1,0 +1,9 @@
+# Ignore local SQLite databases
+*.db
+*.db-journal
+
+# Ignore Python cache & virtual environments
+__pycache__/
+*.pyc
+venv/
+.venv/
