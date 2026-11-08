@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 4. Copy your renamed server file
 COPY main.py .
+COPY index.html .
 
 # 5. Document port 8000
 EXPOSE 8000

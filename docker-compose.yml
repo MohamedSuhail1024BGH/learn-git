@@ -5,6 +5,18 @@ services:
     network_mode: "host"
     volumes:
       - ./ai_chat.db:/app/ai_chat.db
+      - ./main.py:/app/main.py
+      - ./index.html:/app/index.html
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     environment:
       - OLLAMA_HOST=http://127.0.0.1:11434
+    restart: unless-stopped
+
+  db-viewer:
+    image: coleifer/sqlite-web
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./ai_chat.db:/data/ai_chat.db
+    command: sqlite_web -H 0.0.0.0 -p 8080 /data/ai_chat.db
     restart: unless-stopped

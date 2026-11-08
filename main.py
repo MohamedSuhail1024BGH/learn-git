@@ -3,7 +3,7 @@ import sqlite3
 import ollama
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 
 app = FastAPI()
@@ -79,6 +79,10 @@ def stream_ai_and_save(user_id: int, user_prompt: str, model_name: str):
     """, (user_id, user_prompt, full_reply, model_name, len(full_reply)))
     conn.commit()
     conn.close()
+
+@app.get("/")
+def serve_frontend():
+    return FileResponse("index.html")
 
 @app.post("/chat_with_ai")
 def handle_ai_chat(msg: ChatMessage):
