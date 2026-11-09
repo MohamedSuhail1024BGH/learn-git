@@ -60,10 +60,30 @@ class PlanUpdate(BaseModel):
     plan: str
 
 def stream_ai_and_save(user_id: int, user_prompt: str, model_name: str):
+    conn = sqlite3.connect("ai_chat.db")
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT prompt, ai_reply FROM history
+        WHERE user_id = ?
+        ORDER BY id DESC LIMIT 5
+    """, (user_id,))
+    past_rows = cursor.fetchall()
+    conn.close()
+
+    conversation = [
+        {"role": "system", "content": "You are a helpful assistant."}
+    ]
+    for row in reversed(past_rows):
+        conversation.append({"role": "user", "content": row["prompt"]})
+        conversation.append({"role": "asssistant", "content": row["ai_reply"]})
+
+    conversation.append({"role": "user", "content": user_prompt})
+
     full_reply = ""
     stream = ollama_client.chat(
-        model="qwen2.5:1.5b",
-        messages=[{"role": "user", "content": user_prompt}],
+        model=model_name,
+        messages=conversation,
         stream=True
     )
     for chunk in stream:
