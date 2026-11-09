@@ -7,6 +7,7 @@ services:
       - ./ai_chat.db:/app/ai_chat.db
       - ./main.py:/app/main.py
       - ./index.html:/app/index.html
+      - ./test_main.py:/app/test_main.py
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     environment:
       - OLLAMA_HOST=http://127.0.0.1:11434
