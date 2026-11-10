@@ -1,15 +1,16 @@
-# Full-Stack Local AI Chat (FastAPI + SQLite + Ollama + Docker)
+# [LEARN_GIT] Local AI Chat - Full-Stack FastAPI, SQLite, Ollama, Docker
 
-A containerized, multi-tiered AI chat application featuring Role-Based Access Control (RBAC), full relational CRUD operations, and real-time token streaming.
+![FastAPI Automated Test](https://github.com/MohamedSuhail1024BGH/learn-git/actions/workflows/test.yml/badge.svg)
 
-## Architecture & Features
-- **Backend:** FastAPI with `StreamingResponse` for real-time LLM token streaming
-- **Database:** Relational SQLite schema (`users` & `history` with Foreign Key constraints and `INNER JOIN` queries)
-- **AI Engine:** Local LLM inference via Ollama (`qwen2.5:1.5b` / `llama3` / `mistral`)
-- **Access Control:** Free vs. Pro tier enforcement (`HTTP 403 Forbidden` guard)
-- **Containerization:** Docker & Docker Compose with persistent volume bind mounts
+A containerized full-stack AI chat application featuring live token streaming, multi-turn conversational memory, Role-Based Access Control (RBAC), and a multi-container Docker Compose setup.
+
+## Architecture & Tech Stack
+- **Backend API:** FastAPI (`main.py`) with `StreamingResponse` and `FileResponse`
+- **Database & Memory:** SQLite (`ai_chat.db`) with Foreign Keys, `INNER JOIN`, and 5-turn sliding context window
+- **LLM Engine:** Local Ollama inference
+- **Containers:** Multi-container `docker-compose.yml` (`backend` on `:8000` + `sqlite-web` admin dashboard on `:8080`)
+- **CI & Testing:** Automated `pytest` suite running on GitHub Actions (`ubuntu-24.04`)
 
 ## Quick Start (Docker Compose)
-1. Ensure [Ollama](https://ollama.com/) is running locally on port `11434`:
    ```bash
-   ollama pull qwen2.5:1.5b
+   docker compose up -d
