@@ -163,6 +163,14 @@
       <option value="mistral">mistral (Pro Tier)</option>
     </select>
 
+    <label for="persona">Persona</label>
+    <select id="persona">
+      <option value="default">Helpful and Concise Assistant</option>
+      <option value="coder">Strict Senior Backend Engineer</option>
+      <option value="linux">Veteran Linux System Administrator</option>
+      <option value="pirate">17th Century Pirate Captain</option>
+    </select>
+
     <label for="promptBox">Your Prompt</label>
     <textarea id="promptBox" rows="2" placeholder="Ask something..."></textarea>
 
@@ -249,6 +257,7 @@
       const btn = document.getElementById("sendBtn");
       const user = document.getElementById("username").value.trim();
       const selectedModel = document.getElementById("modelSelect").value;
+      const persona = document.getElementById("persona").value;
       const promptInput = document.getElementById("promptBox");
       const promptText = promptInput.value.trim();
       const container = document.getElementById("historyContainer");
@@ -265,7 +274,8 @@
           body: JSON.stringify({
             sender: user,
             prompt: promptText,
-            model: selectedModel
+            model: selectedModel,
+            persona: persona
           })
         });
 

@@ -47,10 +47,18 @@ def init_db():
 
 init_db()
 
+PERSONAS = {
+    "default": "You're a helpful, concise AI assistant.",
+    "coder": "You are a strict Senior Backend Engineer. Review code critically, point out edge cases, and always follow PEP 8 and production best practices.",
+    "linux": "You are a veteran Linux System Administrator. Answer with practical bash commands, flags, and terminal explanations.",
+    "pirate": "You are a 17th-century pirate captain. Answer every technical question in heavy pirate slang while still being accurate."
+}
+
 class ChatMessage(BaseModel):
     sender: str
     prompt: str
     model: str = "qwen2.5:1.5b"
+    persona: str = "default"
 
 class NewUser(BaseModel):
     username: str
@@ -59,7 +67,7 @@ class NewUser(BaseModel):
 class PlanUpdate(BaseModel):
     plan: str
 
-def stream_ai_and_save(user_id: int, user_prompt: str, model_name: str):
+def stream_ai_and_save(user_id: int, user_prompt: str, model_name: str, persona_key: str = "default"):
     conn = sqlite3.connect("ai_chat.db")
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -71,8 +79,9 @@ def stream_ai_and_save(user_id: int, user_prompt: str, model_name: str):
     past_rows = cursor.fetchall()
     conn.close()
 
+    system_instruction = PERSONAS.get(persona_key, PERSONAS["default"])
     conversation = [
-        {"role": "system", "content": "You are a helpful assistant."}
+        {"role": "system", "content": system_instruction}
     ]
     for row in reversed(past_rows):
         conversation.append({"role": "user", "content": row["prompt"]})
@@ -121,7 +130,7 @@ def handle_ai_chat(msg: ChatMessage):
         raise HTTPException(status_code=403, detail="Upgrade to Pro to use this model")
 
     return StreamingResponse(
-        stream_ai_and_save(user["id"], msg.prompt, msg.model),
+        stream_ai_and_save(user["id"], msg.prompt, msg.model, msg.persona),
         media_type="text/plain"
     )
 
