@@ -118,7 +118,7 @@ def handle_ai_chat(msg: ChatMessage):
 
     premium_models = ["llama3", "llama3:8b", "mistral"]
     if msg.model in premium_models and user["plan"] != "pro":
-        #raise HTTPException(status_code=403, detail="Upgrade to Pro to use this model")
+        raise HTTPException(status_code=403, detail="Upgrade to Pro to use this model")
 
     return StreamingResponse(
         stream_ai_and_save(user["id"], msg.prompt, msg.model),
