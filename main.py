@@ -1,12 +1,23 @@
 import os
 import sqlite3
 import ollama
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 
 app = FastAPI()
+
+API_SECRET_KEY = os.getenv("API_SECRET_KEY", "super-secret-dev-key")
+
+def verify_api_key(x_api_key: str = Header(default=None)):
+    """Rejects any request missing a matching X-API-KEY header with 401 Unauthorized."""
+    if x_api_key != API_SECRET_KEY:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing X-API-KEY header"
+        )
+    return x_api_key
 
 app.add_middleware(
     CORSMiddleware,
@@ -114,7 +125,7 @@ def serve_frontend():
     return FileResponse("index.html")
 
 @app.post("/chat_with_ai")
-def handle_ai_chat(msg: ChatMessage):
+def handle_ai_chat(msg: ChatMessage, api_key: str = Depends(verify_api_key)):
     conn = sqlite3.connect("ai_chat.db")
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()

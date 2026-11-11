@@ -171,6 +171,9 @@
       <option value="pirate">17th Century Pirate Captain</option>
     </select>
 
+    <label for="apiKey">API Key</label>
+    <input type="password" id="apiKey" value="super-secret-dev-key" placeholder="Enter API Key" />
+
     <label for="promptBox">Your Prompt</label>
     <textarea id="promptBox" rows="2" placeholder="Ask something..."></textarea>
 
@@ -261,6 +264,7 @@
       const promptInput = document.getElementById("promptBox");
       const promptText = promptInput.value.trim();
       const container = document.getElementById("historyContainer");
+      const apiKey = document.getElementById(apiKey).value;
 
       if (!promptText) return;
 
@@ -270,7 +274,10 @@
       try {
         const response = await fetch("/chat_with_ai", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "X-API-KEY": apiKey
+          },
           body: JSON.stringify({
             sender: user,
             prompt: promptText,
