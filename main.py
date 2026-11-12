@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import ollama
+import time
 from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
@@ -18,6 +19,24 @@ def verify_api_key(x_api_key: str = Header(default=None)):
             detail="Invalid or missing X-API-KEY header"
         )
     return x_api_key
+
+RATE_LIMIT_MAX = 5
+RATE_LIMIT_WINDOW = 60
+request_timestamps: dict[str, list[float]] = {}
+
+def check_rate_limit(username: str):
+    """Rejects users who exceed RATE_LIMIT_MAX requests within RATE_LIMIT_WINDOW seconds."""
+    now = time.time()
+    user_history = request_timestamps.get(username, [])
+    valid_timestamps = [t for t in user_history if now - t < RATE_LIMIT_WINDOW]
+
+    if len(valid_timestamps) >= RATE_LIMIT_MAX:
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded! Maximum 5 messages per minute."
+        )
+    valid_timestamps.append(now)
+    request_timestamps[username] = valid_timestamps
 
 app.add_middleware(
     CORSMiddleware,
@@ -126,6 +145,7 @@ def serve_frontend():
 
 @app.post("/chat_with_ai")
 def handle_ai_chat(msg: ChatMessage, api_key: str = Depends(verify_api_key)):
+    check_rate_limit(msg.sender)
     conn = sqlite3.connect("ai_chat.db")
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()

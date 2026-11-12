@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 from unittest.mock import patch
-from main import app, init_db, PERSONAS
+from main import app, init_db, PERSONAS, request_timestamps
 
 init_db()  # Ensure the database is initialized before running tests
 client = TestClient(app)
@@ -80,3 +80,23 @@ def test_missing_or_wrong_api_key_blocked():
         }
     )
     assert response.status_code == 401
+
+@patch("main.ollama_client.chat")
+def test_rate_limiter_blocks_spam(mock_ollama_chat):
+    """7. Verify sending more than 5 requests in 60s returns 429 Too Many Requests"""
+    mock_ollama_chat.return_value = [{"message": {"content": "OK"}}]
+    request_timestamps.pop("Hari", None)
+
+    payload = {
+        "sender": "Hari",
+        "prompt": "Ping",
+        "model": "qwen2.5:1.5b"
+    }
+
+    for _ in range(5):
+        res = client.post("/chat_with_ai", headers=VALID_HEADERS, json=payload)
+        assert res.status_code == 200
+
+    blocked_res = client.post("/chat_with_ai", headers=VALID_HEADERS, json=payload)
+    assert blocked_res.status_code == 429
+    assert "Rate limit exceeded" in blocked_res.json()["detail"]
