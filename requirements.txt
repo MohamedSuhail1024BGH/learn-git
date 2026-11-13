@@ -3,4 +3,5 @@ uvicorn
 pydantic
 ollama
 pytest
-httpx2
+httpx
+psycopg2-binary

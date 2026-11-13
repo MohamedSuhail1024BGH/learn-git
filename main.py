@@ -1,11 +1,12 @@
 import os
-import sqlite3
+import psycopg2
 import ollama
 import time
 from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
+from psycopg2.extras import RealDictCursor
 
 app = FastAPI()
 
@@ -38,6 +39,15 @@ def check_rate_limit(username: str):
     valid_timestamps.append(now)
     request_timestamps[username] = valid_timestamps
 
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://suhail:password456@localhost:5432/ai_chat_db"
+)
+
+def get_db_connection():
+    """Returns a PostgreSQL connection where rows behave like Python dictionaries."""
+    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -50,28 +60,30 @@ OLLAMA_URL = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
 ollama_client = ollama.Client(host=OLLAMA_URL)
 
 def init_db():
-    conn = sqlite3.connect("ai_chat.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
             plan TEXT DEFAULT 'free'
         )
     """)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            prompt TEXT,
-            ai_reply TEXT,
-            model TEXT,
-            tokens INTEGER,
-            FOREIGN KEY (user_id) REFERENCES users(id)
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            prompt TEXT NOT NULL,
+            ai_reply TEXT NOT NULL,
+            model TEXT NOT NULL,
+            tokens INTEGER NOT NULL
         )
     """)
-    cursor.execute("INSERT OR IGNORE INTO users (username, plan) VALUES ('Hari', 'pro')")
-    cursor.execute("INSERT OR IGNORE INTO users (username, plan) VALUES ('Karan', 'free')")
+    cursor.execute("""
+        INSERT INTO users (username, plan)
+        VALUES ('Suhail', 'pro'), ('Karan', 'free')
+        ON CONFLICT (username) DO NOTHING
+    """)
     conn.commit()
     conn.close()
 
@@ -98,12 +110,11 @@ class PlanUpdate(BaseModel):
     plan: str
 
 def stream_ai_and_save(user_id: int, user_prompt: str, model_name: str, persona_key: str = "default"):
-    conn = sqlite3.connect("ai_chat.db")
-    conn.row_factory = sqlite3.Row
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT prompt, ai_reply FROM history
-        WHERE user_id = ?
+        WHERE user_id = %s
         ORDER BY id DESC LIMIT 5
     """, (user_id,))
     past_rows = cursor.fetchall()
@@ -130,11 +141,11 @@ def stream_ai_and_save(user_id: int, user_prompt: str, model_name: str, persona_
         full_reply += token
         yield token
 
-    conn = sqlite3.connect("ai_chat.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO history (user_id, prompt, ai_reply, model, tokens)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
     """, (user_id, user_prompt, full_reply, model_name, len(full_reply)))
     conn.commit()
     conn.close()
@@ -146,10 +157,9 @@ def serve_frontend():
 @app.post("/chat_with_ai")
 def handle_ai_chat(msg: ChatMessage, api_key: str = Depends(verify_api_key)):
     check_rate_limit(msg.sender)
-    conn = sqlite3.connect("ai_chat.db")
-    conn.row_factory = sqlite3.Row
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, plan FROM users WHERE username = ?", (msg.sender,))
+    cursor.execute("SELECT id, plan FROM users WHERE username = %s", (msg.sender,))
     user = cursor.fetchone()
     conn.close()
 
@@ -167,14 +177,13 @@ def handle_ai_chat(msg: ChatMessage, api_key: str = Depends(verify_api_key)):
 
 @app.get("/chats/{username}")
 def get_user_chats(username: str):
-    conn = sqlite3.connect("ai_chat.db")
-    conn.row_factory = sqlite3.Row
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT users.username, users.plan, history.prompt, history.ai_reply, history.model, history.tokens
         FROM history
         INNER JOIN users ON history.user_id = users.id
-        WHERE users.username = ?
+        WHERE users.username = %s
     """, (username,))
     rows = cursor.fetchall()
     conn.close()
@@ -182,12 +191,12 @@ def get_user_chats(username: str):
 
 @app.post("/register")
 def register_user(user: NewUser):
-    conn = sqlite3.connect("ai_chat.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("INSERT INTO users (username, plan) VALUES (?, ?)", (user.username.strip(), user.plan))
+        cursor.execute("INSERT INTO users (username, plan) VALUES (%s, %s)", (user.username.strip(), user.plan))
         conn.commit()
-    except sqlite3.IntegrityError:
+    except psycopg2.IntegrityError:
         conn.close()
         raise HTTPException(status_code=400, detail="Username already exists!")
     conn.close()
@@ -195,9 +204,9 @@ def register_user(user: NewUser):
 
 @app.put("/users/{username}/plan")
 def update_user_plan(username: str, update_data: PlanUpdate):
-    conn = sqlite3.connect("ai_chat.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("UPDATE users SET plan = ? WHERE username = ?", (update_data.plan, username))
+    cursor.execute("UPDATE users SET plan = %s WHERE username = %s", (update_data.plan, username))
     if cursor.rowcount == 0:
         conn.close()
         raise HTTPException(status_code=404, detail="User not found")
@@ -207,15 +216,14 @@ def update_user_plan(username: str, update_data: PlanUpdate):
 
 @app.delete("/chats/{username}")
 def clear_user_chats(username: str):
-    conn = sqlite3.connect("ai_chat.db")
-    conn.row_factory = sqlite3.Row
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+    cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
     user = cursor.fetchone()
     if not user:
         conn.close()
         raise HTTPException(status_code=404, detail="User not found")
-    cursor.execute("DELETE FROM history WHERE user_id = ?", (user["id"],))
+    cursor.execute("DELETE FROM history WHERE user_id = %s", (user["id"],))
     conn.commit()
     conn.close()
     return {"status": "cleared", "deleted_for": username}
