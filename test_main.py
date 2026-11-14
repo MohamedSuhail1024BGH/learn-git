@@ -15,7 +15,7 @@ def test_serve_frontend():
 
 def test_get_user_chats():
     """2. Verify GET /chats/{username} returns a JSON list (200 OK)"""
-    response = client.get("/chats/Hari")
+    response = client.get("/chats/Suhail")
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, (list, dict))
@@ -53,7 +53,7 @@ def test_pro_user_ai_stream_and_persona(mock_ollama_chat):
         "/chat_with_ai",
         headers=VALID_HEADERS,
         json={
-        "sender": "Hari",
+        "sender": "Suhail",
         "prompt": "Status report",
         "model": "qwen2.5:1.5b",
         "persona": "pirate"
@@ -74,7 +74,7 @@ def test_missing_or_wrong_api_key_blocked():
         "/chat_with_ai",
         headers={"X-API-KEY": "wrong-hacker-key"},
         json={
-            "sender": "Hari",
+            "sender": "Suhail",
             "prompt": "Let me in!",
             "model": "qwen2.5:1.5b"
         }
@@ -85,10 +85,10 @@ def test_missing_or_wrong_api_key_blocked():
 def test_rate_limiter_blocks_spam(mock_ollama_chat):
     """7. Verify sending more than 5 requests in 60s returns 429 Too Many Requests"""
     mock_ollama_chat.return_value = [{"message": {"content": "OK"}}]
-    request_timestamps.pop("Hari", None)
+    request_timestamps.pop("Suhail", None)
 
     payload = {
-        "sender": "Hari",
+        "sender": "Suhail",
         "prompt": "Ping",
         "model": "qwen2.5:1.5b"
     }
